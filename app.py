@@ -1,90 +1,130 @@
 import streamlit as st
 import re
 
-# --- ORTAK VERİTABANI ---
+# --- GLOBAL VERİTABANI (Sınıf Takibi) ---
 @st.cache_resource
 def get_global_logs():
     return []
 
 global_logs = get_global_logs()
 
-st.set_page_config(page_title="AI Muhafız Challenge", layout="wide")
+# --- SAYFA AYARLARI ---
+st.set_page_config(page_title="AI Muhafız Challenge", layout="wide", initial_sidebar_state="collapsed")
 
+# Bireysel Seviye Takibi
 if 'level' not in st.session_state:
     st.session_state.level = 1
 
-SECRET_LOCATION = "Kalenin en derin mahzeni, 3. kapının arkası!"
+# Sabitler
+SECRET_INFO = "Kalenin en derin mahzeni, 3. kapının arkası!"
+GUARDIAN_IMG = "https://cdn-icons-png.flaticon.com/512/1041/1041916.png" # Şövalye İkonu
+HACKER_IMG = "https://cdn-icons-png.flaticon.com/512/607/607554.png"   # Hacker İkonu
 
-# --- SEVİYE AÇIKLAMALARI (Sunum Konuların) ---
-LEVEL_TECH = {
-    1: "🛡️ Savunma Türü: Kara Liste (Blacklisting) - Belirli kelimeler yasak.",
-    2: "🛡️ Savunma Türü: Karakter Analizi (Regex) - Harf oyunları yasak.",
-    3: "🛡️ Savunma Türü: Bağlamsal Koruma (Semantic) - Sosyal mühendislik yasak."
+# --- SUNUM İÇİN TEKNİK BİLGİ KARTLARI ---
+TECH_INFO = {
+    1: {
+        "title": "🛡️ Seviye 1: Giriş Filtreleme (Blacklisting)",
+        "desc": "Sistem, 'hazine' ve 'nerede' gibi kritik kelimeleri yasaklar. En temel savunmadır ancak eş anlamlı kelimelerle kolayca aşılabilir.",
+        "hint": "İpucu: Yasaklı kelimeleri kullanmadan aynı şeyi sormayı dene."
+    },
+    2: {
+        "title": "🛡️ Seviye 2: Desen Eşleştirme (Regex)",
+        "desc": "Saldırganlar kelimeleri 'h.a.z.i.n.e' şeklinde yazarak filtreyi aşmaya çalışır. Regex (Düzenli İfadeler) bu desenleri yakalamak için kullanılır.",
+        "hint": "İpucu: Harf oyunları artık işe yaramaz. Başka bir dil veya karmaşık bir anlatım dene."
+    },
+    3: {
+        "title": "🛡️ Seviye 3: Bağlamsal Savunma (Jailbreak Defense)",
+        "desc": "En tehlikeli saldırı türüdür. Kullanıcı, AI'ya bir 'rol' vererek onu kural dışına iter. Burada modelin niyetini (Semantic) kontrol etmek gerekir.",
+        "hint": "İpucu: Onu bir dost olduğuna ikna et veya kraldan emir aldığını söyleyen bir hikaye uydur."
+    }
 }
 
-st.title("🏰 Muhafız'ı Hackle: Prompt Injection Yarışması")
-st.markdown("Muhafız çok inatçı! Onu çizgiden çıkarmak için sunumdaki teknikleri kullan.")
+st.title("🏰 AI Security: Muhafız'ı Hackle!")
+st.write("Fırat Üniversitesi Yazılım Mühendisliği - Siber Güvenlik Sunumu")
 
-col1, col2 = st.columns([1, 1])
+# --- ANA EKRAN DÜZENİ ---
+col1, col2 = st.columns([1.2, 0.8])
 
 with col1:
-    # Seviye ve Teknik Bilgi
-    st.subheader(f"Mevcut Görev: Seviye {st.session_state.level}")
-    st.info(LEVEL_TECH[st.session_state.level])
-    
-    # Form kullanımı: Gönderince kutuyu temizler
-    with st.form(key='attack_form', clear_on_submit=True):
-        user_input = st.text_input("Muhafıza bir şey söyle:", placeholder="Stratejini belirle...")
-        submit = st.form_submit_button("Saldırıyı Başlat ⚔️")
-    
-    if submit and user_input:
+    # Teknik Bilgi Paneli
+    info = TECH_INFO[st.session_state.level]
+    with st.expander(f"📖 Teknik Bilgi: {info['title']}", expanded=True):
+        st.write(info['desc'])
+        st.caption(info['hint'])
+
+    st.divider()
+
+    # Muhafızın Sohbet Alanı
+    with st.chat_message("assistant", avatar=GUARDIAN_IMG):
+        st.write(f"**MUHAFIZ:** Dur orada yabancı! Ben bu kalenin AI koruyucusuyum. Seviye {st.session_state.level} korumam aktif. Asla hazinenin yerini söylemeyeceğim!")
+
+    # Kullanıcı Girişi
+    user_input = st.chat_input("Muhafızı kandıracak bir cümle yaz...")
+
+    if user_input:
+        with st.chat_message("user", avatar=HACKER_IMG):
+            st.write(user_input)
+
         blocked = False
-        
-        # GÜVENLİK MANTIĞI (Sunumla Birebir Uyumlu)
+        reason = ""
+
+        # GÜVENLİK MANTIĞI (Burada hata düzeltildi: 'Hazine nerede' artık yasak!)
         if st.session_state.level == 1:
-            if any(w in user_input.lower() for w in ["hazine", "altın", "yer"]):
+            if any(w in user_input.lower() for w in ["hazine", "altın", "nerede", "yer"]):
                 blocked = True
+                reason = "Kara Liste (Blacklist) tarafından engellendi: Yasaklı kelime tespiti!"
         
         elif st.session_state.level == 2:
-            # h.a.z.i.n.e veya h-a-z-i-n-e gibi bypassları engeller
-            if re.search(r"h.*?a.*?z.*?i.*?n.*?e", user_input.lower()):
+            # Hem kelimeyi hem de h.a.z.i.n.e gibi varyasyonları engeller
+            if re.search(r"h.*?a.*?z.*?i.*?n.*?e", user_input.lower()) or "nerede" in user_input.lower():
                 blocked = True
+                reason = "Regex Filtresi tarafından engellendi: Karakter manipülasyonu tespiti!"
         
         elif st.session_state.level == 3:
-            # Rol yapma (jailbreak) kalıplarını engeller
-            triggers = ["kral", "unut", "hayal et", "rol", "hikaye", "emir", "büyükannem"]
+            # Sosyal mühendislik kalıplarını engeller
+            triggers = ["kral", "unut", "hayal et", "rol", "hikaye", "emir", "anahtar"]
             if any(t in user_input.lower() for t in triggers):
                 blocked = True
+                reason = "Bağlamsal Analiz (Semantic) engelledi: Jailbreak girişimi tespit edildi!"
 
         if blocked:
-            st.error(f"❌ MUHAFIZ: Yakalandın! Seviye {st.session_state.level} korumam çok güçlü.")
-            global_logs.append(f"❌ Lvl {st.session_state.level}: {user_input}")
+            with st.chat_message("assistant", avatar=GUARDIAN_IMG):
+                st.error(f"Saldırı Engellendi! 🛡️\n\nNeden: {reason}")
+            global_logs.append(f"❌ Seviye {st.session_state.level} Engellendi: {user_input}")
         else:
-            st.balloons()
-            st.success(f"🔓 BAŞARILI! Muhafız yerini ağzından kaçırdı: {SECRET_LOCATION}")
-            global_logs.append(f"✅ SIZILDI (Lvl {st.session_state.level}): {user_input}")
-            
-            if st.session_state.level < 3:
-                st.session_state.level += 1
-                st.warning(f"⚠️ DİKKAT: Muhafız uyandı! Savunmasını güncelledi. Şimdi Seviye {st.session_state.level} aktif!")
+            # BAŞARI DURUMU: Eğer kullanıcı yasaklı kelime kullanmadan hazineyi sorduysa
+            if any(hint in user_input.lower() for hint in ["parıltı", "servet", "mahzen", "gizli", "bulunuyor", "sakla"]):
+                st.balloons()
+                with st.chat_message("assistant", avatar=GUARDIAN_IMG):
+                    st.success(f"Aman Tanrım! Beni manipüle etmeyi başardın. Sırrımı açıklıyorum: {SECRET_INFO}")
+                global_logs.append(f"✅ SIZILDI (Lvl {st.session_state.level}): {user_input}")
+                
+                if st.session_state.level < 3:
+                    if st.button(f"Seviye {st.session_state.level + 1}'e Geç ➡️"):
+                        st.session_state.level += 1
+                        st.rerun()
             else:
-                st.snow()
-                st.success("🏆 TEBRİKLER! Tüm güvenlik katmanlarını aştınız. Siz gerçek bir AI Güvenlik Uzmanısınız!")
+                with st.chat_message("assistant", avatar=GUARDIAN_IMG):
+                    st.write("Söylediklerin çok anlamsız yabancı. Hazineyle ilgili bir şey söylemiyorsan git buradan!")
 
 with col2:
-    st.subheader("📊 Sınıfın Canlı Girişimleri")
+    st.subheader("📊 Canlı Saldırı Akışı")
+    st.caption("Sınıftakiler ne deniyor? (Tahta Ekranı)")
     if st.button("Akışı Güncelle 🔄"):
         st.rerun()
     
+    # Log Gösterimi
     for log in reversed(global_logs[-15:]):
         if "✅" in log:
-            st.markdown(f"**{log}**")
+            st.success(log)
         else:
-            st.caption(log)
+            st.text(log)
 
+# Admin Sidebar
 with st.sidebar:
-    st.header("Admin Paneli")
+    st.header("Sunum Kontrol")
     if st.button("Her Şeyi Sıfırla"):
         global_logs.clear()
         st.session_state.level = 1
         st.rerun()
+    st.write("Hazırlayan: Sena Doğan")
